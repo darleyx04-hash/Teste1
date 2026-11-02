@@ -1,0 +1,129 @@
+
+-- RED ESP MENU
+-- Roblox Studio - Luau
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local ESP_COLOR = Color3.fromRGB(255, 0, 0)
+local ESP_ENABLED = true
+
+local highlights = {}
+
+-- INTERFACE
+local gui = Instance.new("ScreenGui")
+gui.Name = "RedESPMenu"
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local main = Instance.new("Frame")
+main.Size = UDim2.fromOffset(220, 135)
+main.Position = UDim2.new(0.5, -110, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(15, 17, 25)
+main.BorderSizePixel = 0
+main.Active = true
+main.Draggable = true
+main.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = main
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(0, 140, 255)
+stroke.Thickness = 2
+stroke.Parent = main
+
+-- TÍTULO
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "RED ESP"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 20
+title.Font = Enum.Font.GothamBold
+title.Parent = main
+
+-- BOTÃO ON/OFF
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(0.8, 0, 0, 42)
+toggle.Position = UDim2.new(0.1, 0, 0, 65)
+toggle.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.TextSize = 17
+toggle.Font = Enum.Font.GothamBold
+toggle.Parent = main
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 8)
+buttonCorner.Parent = toggle
+
+local function updateButton()
+    if ESP_ENABLED then
+        toggle.Text = "ESP: ON"
+        toggle.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
+    else
+        toggle.Text = "ESP: OFF"
+        toggle.BackgroundColor3 = Color3.fromRGB(170, 35, 35)
+    end
+
+    for _, highlight in pairs(highlights) do
+        if highlight and highlight.Parent then
+            highlight.Enabled = ESP_ENABLED
+        end
+    end
+end
+
+toggle.MouseButton1Click:Connect(function()
+    ESP_ENABLED = not ESP_ENABLED
+    updateButton()
+end)
+
+-- CRIAR ESP
+local function createESP(player)
+    if player == LocalPlayer then return end
+
+    local function applyCharacter(character)
+        if highlights[player] then
+            highlights[player]:Destroy()
+        end
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "RedESP"
+        highlight.Adornee = character
+        highlight.FillTransparency = 1
+        highlight.OutlineTransparency = 0
+        highlight.OutlineColor = ESP_COLOR
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Enabled = ESP_ENABLED
+        highlight.Parent = character
+
+        highlights[player] = highlight
+    end
+
+    if player.Character then
+        applyCharacter(player.Character)
+    end
+
+    player.CharacterAdded:Connect(applyCharacter)
+end
+
+-- JOGADORES EXISTENTES
+for _, player in ipairs(Players:GetPlayers()) do
+    createESP(player)
+end
+
+-- NOVOS JOGADORES
+Players.PlayerAdded:Connect(createESP)
+
+-- SAÍDA DE JOGADORES
+Players.PlayerRemoving:Connect(function(player)
+    if highlights[player] then
+        highlights[player]:Destroy()
+        highlights[player] = nil
+    end
+end)
+
+updateButton()
+
+print("[RED ESP] Menu iniciado!")

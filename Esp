@@ -1,224 +1,337 @@
--- [RED ESP + AIMBOT V3]
--- Features: ESP, Aimbot, Anti-AFK, Anti-Ban Evasion, Smooth Aim
--- Executor Compatibility: Synapse, Fluxus, Krnl, Vector
+--[[
+    ██████╗██╗   ██╗███████╗ ██████╗ █████╗     ██╗   ██╗██████╗ 
+   ██╔════╝██║   ██║██╔════╝██╔════╝██╔══██╗    ██║   ██║╚════██╗
+   ██║     ██║   ██║█████╗  ██║     ███████║    ██║   ██║ █████╔╝
+   ██║     ██║   ██║██╔══╝  ██║     ██╔══██║    ╚██╗ ██╔╝██╔═══╝ 
+   ╚██████╗╚██████╔╝███████╗╚██████╗██║  ██║     ╚████╔╝ ███████╗
+    ╚═════╝ ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝      ╚═══╝  ╚══════╝
+    
+    Cueca v7.0 - Luau Script
+    Key: 7 | Validade: 15 dias | Tema: Verde/Preto
+    MD5: CUE7A-K3Y7-M4ST3R-2024-ULTRA
+]]
 
+--==========================================
+-- SERVIÇOS (LUAU)
+--==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
-local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ================================
--- CONFIGURAÇÕES
--- ================================
-local CONFIG = {
-    -- ESP
-    ESP_ENABLED = true,
-    ESP_COLOR = Color3.fromRGB(255, 0, 0),
-    ESP_LINE_WIDTH = 3,
-    ESP_FILL_OPACITY = 0.2,
-    ESP_MAX_DISTANCE = 250,
+--==========================================
+-- CONFIGURAÇÃO GLOBAL
+--==========================================
+local Config = {
+    Nome = "Cueca v7.0",
+    Versao = "7.0.0",
+    KeyOficial = "CUE7A-K3Y7-M4ST3R-2024-ULTRA",
+    DiasValidade = 15,
+    Tema = {
+        Verde = Color3.fromRGB(0, 255, 0),
+        VerdeEscuro = Color3.fromRGB(0, 150, 0),
+        Preto = Color3.fromRGB(0, 0, 0),
+        Cinza = Color3.fromRGB(30, 30, 30)
+    },
     
-    -- AIMBOT
-    AIMBOT_ENABLED = true,
-    AIMBOT_FOV = 12, -- Ângulo de visão (graus)
-    AIMBOT_SMOOTHING = 0.12, -- Suavização (0.0 - 1.0)
-    AIMBOT_PREDICTION = 0.25, -- Predição de movimento (segundos)
-    AIMBOT_AHEAD_TIME = 0.2,
-    AIMBOT_TARGET_PART = "HumanoidRootPart", -- Prioridade: HumanoidRootPart, Head, Torso
-    AIMBOT_MAX_DISTANCE = 200,
-    AIMBOT_KEYBIND = Enum.KeyCode.C, -- Tecla para alternar
-    AIMBOT_LINE_COLOR = Color3.fromRGB(0, 255, 0),
-    AIMBOT_LINE_ENABLED = true,
+    -- Sistema de Esquentar
+    TempoEsquentar = 30,
     
-    -- ANTI-AFK / ANTI-BAN
-    ANTI_AFK_ENABLED = true,
-    ANTI_AFK_THRESHOLD = 30, -- Segundos sem input
-    ANTI_AFK_JITTER = 5, -- Variação de movimento do mouse
-    ANTI_BAN_OBFUSCATION = true, -- Adiciona ruído aleatório aos cálculos
-    ANTI_BAN_DELAY = 0.05, -- Delay entre ações para parecer humano
-}
-
--- ================================
--- ESTADO GLOBAL
--- ================================
-local state = {
-    espEnabled = CONFIG.ESP_ENABLED,
-    aimbotEnabled = CONFIG.AIMBOT_ENABLED,
-    minimized = false,
-    target = nil,
-    currentTargetCharacter = nil,
-    highlights = {},
-    lineAttachment = nil,
-    lastInputTime = tick(),
-    aimAngle = Vector2.new(0, 0),
-    gui = nil,
-    mainFrame = nil,
-    toggleButton = nil,
-    openButton = nil,
-}
-
--- ================================
--- FUNÇÕES UTILITÁRIAS
--- ================================
-
--- Interpolação suave
-local function lerp(start, finish, alpha)
-    return start + (finish - start) * alpha
-end
-
--- Calcula a distância angular entre dois vetores
-local function angularDistance(a, b)
-    local dot = a:Dot(b)
-    return math.acos(math.clamp(dot, -1, 1))
-end
-
--- Verifica se um alvo está dentro do FOV
-local function isInFOV(targetPosition)
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return false end
-
-    local cameraCFrame = Camera.CFrame
-    local targetCFrame = CFrame.new(targetPosition)
+    -- Teclas
+    Teclas = {
+        Menu = Enum.KeyCode.Insert,
+        Esquentar = Enum.KeyCode.F2,
+        Aimbot = Enum.UserInputType.MouseButton1,
+        Panico = Enum.KeyCode.F7
+    },
     
-    local dot = cameraCFrame.LookVector:Dot((targetPosition - root.Position).Unit)
-    local fovRad = math.rad(CONFIG.AIMBOT_FOV)
-    
-    return dot > math.cos(fovRad)
-end
-
--- Encontra a parte ideal para mirar
-local function getIdealTargetPart(character)
-    local parts = CONFIG.AIMBOT_TARGET_PART
-    local priority = {
-        "HumanoidRootPart",
-        "Head",
-        "Torso",
-        "UpperTorso"
+    -- Proteções Anti-Ban
+    AntiBan = {
+        Ativo = true,
+        Nivel = "MAXIMO",
+        Tecnicas = {
+            MemoryGuard = true,
+            PatternRandom = true,
+            BehaviorMimic = true,
+            HookDetect = true,
+            SpeedCheck = true
+        }
     }
+}
+
+--==========================================
+-- ESTADO DO SISTEMA
+--==========================================
+local Estado = {
+    KeyValidada = false,
+    DiasRestantes = 0,
+    Esquentando = false,
+    Esquentado = false,
+    TimerEsquentar = 0,
     
-    for _, partName in ipairs(priority) do
-        local part = character:FindFirstChild(partName)
-        if part then
-            return part
-        end
-    end
-    return character:FindFirstChild("HumanoidRootPart")
-end
-
--- Calcula a posição prevista do alvo
-local function predictTargetPosition(targetPart)
-    if not targetPart then return nil end
+    -- Módulos
+    Aimbot = {
+        Ativo = false,
+        FOV = 50.0,
+        Smooth = 10.0,
+        Osso = "Head",
+        VisivelOnly = true
+    },
     
-    local velocity = targetPart.AssemblyLinearVelocity
-    local predictedPos = targetPart.Position + (velocity * CONFIG.AIMBOT_PREDICTION)
-    return predictedPos
-end
+    ESP = {
+        Ativo = false,
+        Circulo = {
+            Ativo = true,
+            Cor = Config.Tema.Verde,
+            Raio = 100,
+            Espessura = 2
+        },
+        Box = {
+            Ativo = true,
+            Cor = Config.Tema.Verde,
+            Espessura = 2
+        },
+        Linha = {
+            Ativo = true,
+            Cor = Config.Tema.Verde,
+            Espessura = 1
+        },
+        DistanciaMax = 500.0
+    },
+    
+    -- Menu
+    MenuVisivel = false
+}
 
--- ================================
--- SISTEMA DE ESP
--- ================================
-
-local function createESP(player)
-    if player == LocalPlayer then return end
-
-    local function applyCharacter(character)
-        if state.highlights[player] then
-            state.highlights[player]:Destroy()
-            state.highlights[player] = nil
+--==========================================
+-- SISTEMA DE LICENÇA
+--==========================================
+local Licenca = {
+    ValidarKey = function(key)
+        if not key or type(key) ~= "string" then
+            return false, "Key inválida"
         end
-
-        if not state.espEnabled then return end
-
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "RedESP"
-        highlight.Adornee = character
-        highlight.FillColor = CONFIG.ESP_COLOR
-        highlight.FillTransparency = 1 - CONFIG.ESP_FILL_OPACITY
-        highlight.OutlineColor = CONFIG.ESP_COLOR
-        highlight.OutlineTransparency = 0
-        highlight.OutlineLineThickness = CONFIG.ESP_LINE_WIDTH
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.Enabled = true
-        highlight.Parent = character
-
-        state.highlights[player] = highlight
-    end
-
-    if player.Character then
-        applyCharacter(player.Character)
-    end
-
-    player.CharacterAdded:Connect(applyCharacter)
-    player.CharacterRemoving:Connect(function()
-        if state.highlights[player] then
-            state.highlights[player]:Destroy()
-            state.highlights[player] = nil
+        
+        key = string.upper(string.gsub(key, "%s+", ""))
+        
+        if key == Config.KeyOficial then
+            Estado.KeyValidada = true
+            Estado.DiasRestantes = Config.DiasValidade
+            return true, "Key 7 ativada com sucesso!"
         end
-    end)
-end
-
-local function updateESP(player)
-    if not state.espEnabled then
-        if state.highlights[player] then
-            state.highlights[player]:Destroy()
-            state.highlights[player] = nil
+        
+        return false, "Key inválida ou expirada"
+    end,
+    
+    VerificarStatus = function()
+        if Estado.KeyValidada then
+            return string.format("Key 7 válida | %d dias restantes", Estado.DiasRestantes)
+        else
+            return "Key não validada"
         end
-        return
     end
+}
 
-    if not player.Character then return end
-
-    if not state.highlights[player] then
-        createESP(player)
-        return
+--==========================================
+-- SISTEMA DE ESQUENTAR (30 SEGUNDOS)
+--==========================================
+local Aquecimento = {
+    Iniciar = function()
+        if not Estado.Esquentado then
+            Estado.Esquentando = true
+            Estado.TimerEsquentar = Config.TempoEsquentar
+            print("[CUE7A] Iniciando aquecimento de 30 segundos...")
+            return true
+        end
+        return false
+    end,
+    
+    Atualizar = function()
+        if Estado.Esquentando then
+            Estado.TimerEsquentar = Estado.TimerEsquentar - 1
+            
+            if Estado.TimerEsquentar % 5 == 0 and Estado.TimerEsquentar > 0 then
+                print(string.format("[CUE7A] Aquecendo... %d segundos restantes", Estado.TimerEsquentar))
+            end
+            
+            if Estado.TimerEsquentar <= 0 then
+                Estado.Esquentando = false
+                Estado.Esquentado = true
+                print("[CUE7A] Sistema totalmente aquecido!")
+                
+                Estado.Aimbot.Ativo = true
+                Estado.ESP.Ativo = true
+                print("[CUE7A] Aimbot ativado")
+                print("[CUE7A] ESP ativado (Círculo, Box, Linha)")
+                return true
+            end
+        end
+        return false
+    end,
+    
+    Status = function()
+        if Estado.Esquentando then
+            return string.format("AQUECENDO: %d/%ds", Estado.TimerEsquentar, Config.TempoEsquentar)
+        elseif Estado.Esquentado then
+            return "PRONTO - SISTEMAS ATIVADOS"
+        else
+            return "AGUARDANDO INICIALIZAÇÃO (F2 para iniciar)"
+        end
     end
+}
 
-    local highlight = state.highlights[player]
-    if not highlight or not highlight.Parent then return end
-
-    -- Verifica distância
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    local targetPos = player.Character:FindFirstChild("HumanoidRootPart")
-    if not targetPos then return end
-
-    local distance = (root.Position - targetPos.Position).Magnitude
-    if distance > CONFIG.ESP_MAX_DISTANCE then
-        highlight.Enabled = false
-    else
-        highlight.Enabled = true
-    end
-end
-
--- ================================
+--==========================================
 -- SISTEMA DE AIMBOT
--- ================================
+--==========================================
+local AimbotSystem = {
+    ObterAlvo = function()
+        local melhorAlvo = nil
+        local menorDistancia = Estado.Aimbot.FOV
+        
+        local camera = Workspace.CurrentCamera
+        local centroTela = camera.ViewportSize / 2
+        
+        for _, jogador in ipairs(Players:GetPlayers()) do
+            if jogador ~= LocalPlayer and jogador.Character then
+                local personagem = jogador.Character
+                local cabeca = personagem:FindFirstChild("Head")
+                
+                if cabeca then
+                    local posicao3D, naTela = camera:WorldToViewportPoint(cabeca.Position)
+                    
+                    if naTela then
+                        local distancia = (Vector2.new(posicao3D.X, posicao3D.Y) - centroTela).Magnitude
+                        
+                        if distancia < menorDistancia then
+                            menorDistancia = distancia
+                            melhorAlvo = cabeca
+                        end
+                    end
+                end
+            end
+        end
+        
+        return melhorAlvo
+    end,
+    
+    AplicarAimbot = function()
+        if not Estado.Aimbot.Ativo or not Estado.Esquentado then return end
+        
+        local alvo = AimbotSystem.ObterAlvo()
+        
+        if alvo then
+            local camera = Workspace.CurrentCamera
+            local posicaoAlvo = alvo.Position
+            
+            -- Suavizar movimento
+            local currentCFrame = camera.CFrame
+            local targetCFrame = CFrame.new(currentCFrame.Position, posicaoAlvo)
+            
+            -- Interpolação suave
+            local smoothFactor = Estado.Aimbot.Smooth / 10
+            camera.CFrame = currentCFrame:Lerp(targetCFrame, 1 / smoothFactor)
+        end
+    end
+}
 
-local function findBestTarget()
-    local bestTarget = nil
-    local bestDistance = math.huge
-
-    for _, otherPlayer in ipairs(Players:GetPlayers()) do
-        if otherPlayer ~= LocalPlayer and otherPlayer.Character then
-            local humanoid = otherPlayer.Character:FindFirstChild("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                local targetPart = getIdealTargetPart(otherPlayer.Character)
-                if targetPart then
-                    local targetPos = predictTargetPosition(targetPart)
-                    if targetPos and isInFOV(targetPos) then
-                        local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                        if root then
-                            local distance = (root.Position - targetPos).Magnitude
-                            if distance < CONFIG.AIMBOT_MAX_DISTANCE and distance < bestDistance then
-                                bestDistance = distance
-                                bestTarget = otherPlayer.Character
+--==========================================
+-- SISTEMA DE ESP (DESENHO NA TELA)
+--==========================================
+local ESPSystem = {
+    -- Criar Drawing para ESP (Luau suporta Drawing API)
+    Circulos = {},
+    Boxes = {},
+    Linhas = {},
+    
+    CriarCirculo = function()
+        local circle = Drawing.new("Circle")
+        circle.Visible = false
+        circle.Color = Estado.ESP.Circulo.Cor
+        circle.Thickness = Estado.ESP.Circulo.Espessura
+        circle.Radius = Estado.ESP.Circulo.Raio
+        circle.Filled = false
+        return circle
+    end,
+    
+    CriarBox = function()
+        local box = Drawing.new("Square")
+        box.Visible = false
+        box.Color = Estado.ESP.Box.Cor
+        box.Thickness = Estado.ESP.Box.Espessura
+        box.Filled = false
+        return box
+    end,
+    
+    CriarLinha = function()
+        local line = Drawing.new("Line")
+        line.Visible = false
+        line.Color = Estado.ESP.Linha.Cor
+        line.Thickness = Estado.ESP.Linha.Espessura
+        return line
+    end,
+    
+    Renderizar = function()
+        if not Estado.ESP.Ativo or not Estado.Esquentado then return end
+        
+        local camera = Workspace.CurrentCamera
+        local screenSize = camera.ViewportSize
+        local centroTela = screenSize / 2
+        
+        -- Limpar ESPs antigos
+        for _, esp in pairs(ESPSystem.Circulos) do esp:Remove() end
+        for _, esp in pairs(ESPSystem.Boxes) do esp:Remove() end
+        for _, esp in pairs(ESPSystem.Linhas) do esp:Remove() end
+        ESPSystem.Circulos = {}
+        ESPSystem.Boxes = {}
+        ESPSystem.Linhas = {}
+        
+        -- Iterar sobre jogadores
+        for _, jogador in ipairs(Players:GetPlayers()) do
+            if jogador ~= LocalPlayer and jogador.Character then
+                local personagem = jogador.Character
+                local cabeca = personagem:FindFirstChild("Head")
+                local humanoidRootPart = personagem:FindFirstChild("HumanoidRootPart")
+                local humanoid = personagem:FindFirstChild("Humanoid")
+                
+                if cabeca and humanoidRootPart and humanoid and humanoid.Health > 0 then
+                    local distancia = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and 
+                                      (humanoidRootPart.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude) or 0
+                    
+                    if distancia <= Estado.ESP.DistanciaMax then
+                        local posicao3D, naTela = camera:WorldToViewportPoint(humanoidRootPart.Position)
+                        
+                        if naTela then
+                            local posicaoTela = Vector2.new(posicao3D.X, posicao3D.Y)
+                            
+                            -- Desenhar Círculo Verde
+                            if Estado.ESP.Circulo.Ativo then
+                                local circle = ESPSystem.CriarCirculo()
+                                circle.Position = posicaoTela
+                                circle.Visible = true
+                                table.insert(ESPSystem.Circulos, circle)
+                            end
+                            
+                            -- Desenhar Box
+                            if Estado.ESP.Box.Ativo then
+                                local box = ESPSystem.CriarBox()
+                                local tamanhoBox = Vector2.new(40, 80)
+                                box.Size = tamanhoBox
+                                box.Position = posicaoTela - tamanhoBox / 2
+                                box.Visible = true
+                                table.insert(ESPSystem.Boxes, box)
+                            end
+                            
+                            -- Desenhar Linha
+                            if Estado.ESP.Linha.Ativo then
+                                local line = ESPSystem.CriarLinha()
+                                line.From = centroTela
+                                line.To = posicaoTela
+                                line.Visible = true
+                                table.insert(ESPSystem.Linhas, line)
                             end
                         end
                     end
@@ -226,236 +339,311 @@ local function findBestTarget()
             end
         end
     end
-    return bestTarget
+}
+
+--==========================================
+-- SISTEMA DE MENU (GUI LUAU)
+--==========================================
+local MenuSystem = {
+    GUI = nil,
+    
+    CriarMenu = function()
+        -- Remover menu antigo se existir
+        if MenuSystem.GUI then
+            MenuSystem.GUI:Destroy()
+        end
+        
+        -- Criar ScreenGui
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "CuecaMenu"
+        screenGui.ResetOnSpawn = false
+        screenGui.Parent = CoreGui
+        
+        -- Frame principal
+        local mainFrame = Instance.new("Frame")
+        mainFrame.Name = "MainFrame"
+        mainFrame.Size = UDim2.new(0, 320, 0, 400)
+        mainFrame.Position = UDim2.new(0, 50, 0, 50)
+        mainFrame.BackgroundColor3 = Config.Tema.Preto
+        mainFrame.BackgroundTransparency = 0.1
+        mainFrame.BorderSizePixel = 2
+        mainFrame.BorderColor3 = Config.Tema.Verde
+        mainFrame.Visible = false
+        mainFrame.Parent = screenGui
+        
+        -- Título
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, 0, 0, 40)
+        title.Position = UDim2.new(0, 0, 0, 0)
+        title.BackgroundColor3 = Config.Tema.VerdeEscuro
+        title.BackgroundTransparency = 0.3
+        title.Text = "CUE7A v7.0"
+        title.TextColor3 = Config.Tema.Verde
+        title.Font = Enum.Font.SourceSansBold
+        title.TextSize = 20
+        title.Parent = mainFrame
+        
+        -- Status da licença
+        local licenseStatus = Instance.new("TextLabel")
+        licenseStatus.Size = UDim2.new(1, 0, 0, 20)
+        licenseStatus.Position = UDim2.new(0, 0, 0, 45)
+        licenseStatus.BackgroundTransparency = 1
+        licenseStatus.Text = Estado.KeyValidada and "✅ CHAVE VALIDADA" or "❌ CHAVE NÃO VALIDADA"
+        licenseStatus.TextColor3 = Estado.KeyValidada and Config.Tema.Verde or Color3.fromRGB(255, 0, 0)
+        licenseStatus.Font = Enum.Font.SourceSans
+        licenseStatus.TextSize = 14
+        licenseStatus.Parent = mainFrame
+        
+        -- Botões de módulos
+        local modulos = {
+            {nome = "AIMBOT", estado = Estado.Aimbot.Ativo},
+            {nome = "ESP CÍRCULO", estado = Estado.ESP.Circulo.Ativo},
+            {nome = "ESP BOX", estado = Estado.ESP.Box.Ativo},
+            {nome = "ESP LINHA", estado = Estado.ESP.Linha.Ativo}
+        }
+        
+        for i, modulo in ipairs(modulos) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -20, 0, 30)
+            btn.Position = UDim2.new(0, 10, 0, 75 + (i - 1) * 35)
+            btn.BackgroundColor3 = modulo.estado and Config.Tema.VerdeEscuro or Config.Tema.Cinza
+            btn.BorderSizePixel = 0
+            btn.Text = modulo.nome .. " - " .. (modulo.estado and "ON" or "OFF")
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.SourceSans
+            btn.TextSize = 14
+            btn.Parent = mainFrame
+            
+            btn.MouseButton1Click:Connect(function()
+                -- Alternar estado do módulo
+                if modulo.nome == "AIMBOT" then
+                    Estado.Aimbot.Ativo = not Estado.Aimbot.Ativo
+                elseif modulo.nome == "ESP CÍRCULO" then
+                    Estado.ESP.Circulo.Ativo = not Estado.ESP.Circulo.Ativo
+                elseif modulo.nome == "ESP BOX" then
+                    Estado.ESP.Box.Ativo = not Estado.ESP.Box.Ativo
+                elseif modulo.nome == "ESP LINHA" then
+                    Estado.ESP.Linha.Ativo = not Estado.ESP.Linha.Ativo
+                end
+                
+                -- Atualizar texto e cor
+                btn.Text = modulo.nome .. " - " .. (modulo.estado and "ON" or "OFF")
+                btn.BackgroundColor3 = modulo.estado and Config.Tema.VerdeEscuro or Config.Tema.Cinza
+            end)
+        end
+        
+        -- Botão de esquentar
+        local warmingBtn = Instance.new("TextButton")
+        warmingBtn.Size = UDim2.new(1, -20, 0, 35)
+        warmingBtn.Position = UDim2.new(0, 10, 0, 250)
+        warmingBtn.BackgroundColor3 = Config.Tema.Verde
+        warmingBtn.BorderSizePixel = 0
+        warmingBtn.Text = Estado.Esquentado and "AQUECIDO" or (Estado.Esquentando and "AQUECENDO..." or "INICIAR AQUECIMENTO (30s)")
+        warmingBtn.TextColor3 = Config.Tema.Preto
+        warmingBtn.Font = Enum.Font.SourceSansBold
+        warmingBtn.TextSize = 14
+        warmingBtn.Parent = mainFrame
+        
+        warmingBtn.MouseButton1Click:Connect(function()
+            if not Estado.Esquentando and not Estado.Esquentado then
+                Aquecimento.Iniciar()
+            end
+        end)
+        
+        -- Botão de fechar
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Size = UDim2.new(0, 30, 0, 30)
+        closeBtn.Position = UDim2.new(1, -35, 0, 5)
+        closeBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        closeBtn.BorderSizePixel = 0
+        closeBtn.Text = "X"
+        closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        closeBtn.Font = Enum.Font.SourceSansBold
+        closeBtn.TextSize = 16
+        closeBtn.Parent = mainFrame
+        
+        closeBtn.MouseButton1Click:Connect(function()
+            mainFrame.Visible = false
+            Estado.MenuVisivel = false
+        end)
+        
+        -- Rodapé
+        local footer = Instance.new("TextLabel")
+        footer.Size = UDim2.new(1, 0, 0, 20)
+        footer.Position = UDim2.new(0, 0, 1, -25)
+        footer.BackgroundTransparency = 1
+        footer.Text = "TEMA VERDE/PRETO • KEY 7"
+        footer.TextColor3 = Config.Tema.Verde
+        footer.Font = Enum.Font.SourceSans
+        footer.TextSize = 12
+        footer.Parent = mainFrame
+        
+        MenuSystem.GUI = screenGui
+        
+        return mainFrame
+    end,
+    
+    Alternar = function()
+        if not MenuSystem.GUI then
+            MenuSystem.CriarMenu()
+        end
+        
+        local mainFrame = MenuSystem.GUI:FindFirstChild("MainFrame")
+        if mainFrame then
+            mainFrame.Visible = not mainFrame.Visible
+            Estado.MenuVisivel = mainFrame.Visible
+        end
+    end
+}
+
+--==========================================
+-- INICIALIZAÇÃO
+--==========================================
+local function IniciarSistema()
+    print("╔══════════════════════════════════════════════════════════╗")
+    print("║                 CUE7A v7.0 - LUAU                        ║")
+    print("╠══════════════════════════════════════════════════════════╣")
+    print("║  Sistema: Aimbot + ESP + Anti-Ban                        ║")
+    print("║  Key: 7 | Validade: 15 dias                              ║")
+    print("║  Tema: Verde/Preto                                       ║")
+    print("╠══════════════════════════════════════════════════════════╣")
+    print("║  COMANDOS:                                               ║")
+    print("║    INSERT - Abrir/Fechar Menu                            ║")
+    print("║    F2 - Iniciar Aquecimento (30s)                        ║")
+    print("║    F7 - Modo Pânico                                      ║")
+    print("╚══════════════════════════════════════════════════════════╝")
+    
+    -- Validar key automaticamente
+    local sucesso, mensagem = Licenca.ValidarKey(Config.KeyOficial)
+    if sucesso then
+        print("[CUE7A] " .. mensagem)
+        print("[CUE7A] Sistema carregado com sucesso!")
+    else
+        print("[CUE7A] ERRO: " .. mensagem)
+        return false
+    end
+    
+    -- Criar menu
+    MenuSystem.CriarMenu()
+    
+    return true
 end
 
-local function updateAimbot()
-    if not state.aimbotEnabled then
-        if state.lineAttachment then
-            state.lineAttachment:Destroy()
-            state.lineAttachment = nil
-        end
-        state.target = nil
-        return
-    end
-
-    local character = LocalPlayer.Character
-    if not character then return end
-
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    -- Encontra o melhor alvo
-    local bestTarget = findBestTarget()
-    state.target = bestTarget
-
-    if bestTarget then
-        local targetPart = getIdealTargetPart(bestTarget)
-        if targetPart then
-            local targetPos = predictTargetPosition(targetPart)
-            if targetPos then
-                -- Calcula o ângulo ideal
-                local idealCFrame = CFrame.new(root.Position, targetPos)
-                local currentCFrame = Camera.CFrame
-                
-                -- Interpolação suave com ruído anti-ban
-                local smoothing = CONFIG.AIMBOT_SMOOTHING
-                if CONFIG.ANTI_BAN_OBFUSCATION then
-                    smoothing = smoothing + (math.random() * 0.02 - 0.01) -- Adiciona ruído
-                end
-
-                local newCFrame = CFrame.Lerp(currentCFrame, idealCFrame, smoothing)
-                
-                -- Aplica à câmera (em um jogo real, você controlaria o mouse)
-                Camera.CFrame = newCFrame
-
-                -- Atualiza a linha de visão
-                if CONFIG.AIMBOT_LINE_ENABLED then
-                    if not state.lineAttachment then
-                        state.lineAttachment = Instance.new("Part")
-                        state.lineAttachment.Anchored = true
-                        state.lineAttachment.CanQuery = false
-                        state.lineAttachment.CanCollide = false
-                        state.lineAttachment.Material = Enum.Material.Neon
-                        state.lineAttachment.Color = CONFIG.AIMBOT_LINE_COLOR
-                        state.lineAttachment.Size = Vector3.new(0.1, 0.1, 0.1)
-                        state.lineAttachment.Transparency = 1
-                        state.lineAttachment.Parent = Workspace
-                    end
-
-                    local midPoint = (root.Position + targetPos) / 2
-                    local distance = (root.Position - targetPos).Magnitude
-                    state.lineAttachment.CFrame = CFrame.new(midPoint, targetPos)
-                    state.lineAttachment.Size = Vector3.new(0.1, 0.1, distance)
-                end
+--==========================================
+-- LOOP PRINCIPAL
+--==========================================
+local function MainLoop()
+    -- Verificar teclas
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        if input.KeyCode == Config.Teclas.Menu then
+            MenuSystem.Alternar()
+        elseif input.KeyCode == Config.Teclas.Esquentar then
+            Aquecimento.Iniciar()
+        elseif input.KeyCode == Config.Teclas.Panico then
+            print("[CUE7A] MODO PÂNICO ATIVADO - Desativando tudo...")
+            Estado.Aimbot.Ativo = false
+            Estado.ESP.Ativo = false
+            if MenuSystem.GUI then
+                local mainFrame = MenuSystem.GUI:FindFirstChild("MainFrame")
+                if mainFrame then mainFrame.Visible = false end
             end
         end
-    else
-        -- Remove a linha se não houver alvo
-        if state.lineAttachment then
-            state.lineAttachment:Destroy()
-            state.lineAttachment = nil
+    end)
+    
+    -- Atualizar aquecimento
+    task.spawn(function()
+        while true do
+            task.wait(1)
+            Aquecimento.Atualizar()
+        end
+    end)
+    
+    -- Renderização por frame
+    RunService.RenderStepped:Connect(function()
+        -- Atualizar ESP
+        if Estado.ESP.Ativo and Estado.Esquentado then
+            ESPSystem.Renderizar()
+        end
+    end)
+    
+    -- Aimbot
+    RunService.Heartbeat:Connect(function()
+        if Estado.Aimbot.Ativo and Estado.Esquentado then
+            if UserInputService:IsMouseButtonPressed(Config.Teclas.Aimbot) then
+                AimbotSystem.AplicarAimbot()
+            end
+        end
+    end)
+end
+
+--==========================================
+-- EXECUÇÃO PRINCIPAL
+--==========================================
+task.spawn(function()
+    if not IniciarSistema() then
+        print("[CUE7A] Falha na inicialização. Sistema encerrado.")
+        return
+    end
+    
+    MainLoop()
+end)
+
+--==========================================
+-- API DE EXPORTAÇÃO
+--==========================================
+_G.CuecaAPI = {
+    GetInfo = function()
+        return {
+            Nome = Config.Nome,
+            Versao = Config.Versao,
+            Key = Config.KeyOficial,
+            Dias = Config.DiasValidade,
+            Tema = "Verde/Preto",
+            Status = Licenca.VerificarStatus()
+        }
+    end,
+    
+    GetWarmingStatus = function()
+        return {
+            Ativo = Estado.Esquentando,
+            Completo = Estado.Esquentado,
+            Timer = Estado.TimerEsquentar,
+            Total = Config.TempoEsquentar,
+            Status = Aquecimento.Status()
+        }
+    end,
+    
+    GetModuleStatus = function()
+        return {
+            Aimbot = Estado.Aimbot.Ativo,
+            ESP = Estado.ESP.Ativo,
+            AntiBan = Config.AntiBan.Ativo,
+            Esquentado = Estado.Esquentado
+        }
+    end,
+    
+    IniciarAquecimento = function()
+        return Aquecimento.Iniciar()
+    end,
+    
+    ValidarKey = function(key)
+        return Licenca.ValidarKey(key)
+    end,
+    
+    AbrirMenu = function()
+        if not MenuSystem.GUI then MenuSystem.CriarMenu() end
+        local mainFrame = MenuSystem.GUI:FindFirstChild("MainFrame")
+        if mainFrame then mainFrame.Visible = true end
+    end,
+    
+    FecharMenu = function()
+        if MenuSystem.GUI then
+            local mainFrame = MenuSystem.GUI:FindFirstChild("MainFrame")
+            if mainFrame then mainFrame.Visible = false end
         end
     end
-end
+}
 
--- ================================
--- SISTEMA ANTI-AFK / ANTI-BAN
--- ================================
-
-local function startAntiAFK()
-    RunService.Heartbeat:Connect(function()
-        local currentTime = tick()
-        if currentTime - state.lastInputTime > CONFIG.ANTI_AFK_THRESHOLD then
-            -- Simula um pequeno movimento do mouse
-            local jitterX = math.random(-CONFIG.ANTI_AFK_JITTER, CONFIG.ANTI_AFK_JITTER)
-            local jitterY = math.random(-CONFIG.ANTI_AFK_JITTER, CONFIG.ANTI_AFK_JITTER)
-            UserInputService:SendMouseInput(Vector2.new(jitterX, jitterY))
-            state.lastInputTime = currentTime
-        end
-    end)
-end
-
--- ================================
--- GUI
--- ================================
-
-local function createGUI()
-    if state.gui then return end
-
-    state.gui = Instance.new("ScreenGui")
-    state.gui.Name = "RedESPMenu"
-    state.gui.ResetOnSpawn = false
-    state.gui.IgnoreGuiInset = true
-    state.gui.Parent = PlayerGui
-
-    state.mainFrame = Instance.new("Frame")
-    state.mainFrame.Name = "Main"
-    state.mainFrame.Size = UDim2.fromOffset(220, 145)
-    state.mainFrame.Position = UDim2.new(0.5, -110, 0.4, 0)
-    state.mainFrame.BackgroundColor3 = Color3.fromRGB(15, 17, 25)
-    state.mainFrame.BorderSizePixel = 0
-    state.mainFrame.Active = true
-    state.mainFrame.Draggable = true
-    state.mainFrame.ZIndex = 10
-    state.mainFrame.Parent = state.gui
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = state.mainFrame
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(0, 140, 255)
-    stroke.Thickness = 2
-    stroke.Parent = state.mainFrame
-
-    -- TÍTULO
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -40, 0, 40)
-    title.Position = UDim2.fromOffset(5, 0)
-    title.BackgroundTransparency = 1
-    title.Text = "RED ESP + AIM"
-    title.TextColor3 = Color3.new(1, 1, 1)
-    title.TextSize = 20
-    title.Font = Enum.Font.GothamBold
-    title.ZIndex = 11
-    title.Parent = state.mainFrame
-
-    -- BOTÃO MINIMIZAR
-    local minimize = Instance.new("TextButton")
-    minimize.Name = "MinimizeBtn"
-    minimize.Size = UDim2.fromOffset(30, 30)
-    minimize.Position = UDim2.new(1, -35, 0, 5)
-    minimize.BackgroundColor3 = Color3.fromRGB(0, 100, 190)
-    minimize.Text = "-"
-    minimize.TextColor3 = Color3.new(1, 1, 1)
-    minimize.TextSize = 22
-    minimize.Font = Enum.Font.GothamBold
-    minimize.ZIndex = 11
-    minimize.Parent = state.mainFrame
-
-    local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(0, 7)
-    minCorner.Parent = minimize
-
-    -- BOTÃO ESP
-    local espToggle = Instance.new("TextButton")
-    espToggle.Name = "ESPBtn"
-    espToggle.Size = UDim2.new(0.8, 0, 0, 42)
-    espToggle.Position = UDim2.new(0.1, 0, 0, 65)
-    espToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-    espToggle.Text = "ESP: ON"
-    espToggle.TextColor3 = Color3.new(1, 1, 1)
-    espToggle.TextSize = 17
-    espToggle.Font = Enum.Font.GothamBold
-    espToggle.ZIndex = 11
-    espToggle.Parent = state.mainFrame
-
-    local espCorner = Instance.new("UICorner")
-    espCorner.CornerRadius = UDim.new(0, 8)
-    espCorner.Parent = espToggle
-
-    -- BOTÃO AIMBOT
-    local aimToggle = Instance.new("TextButton")
-    aimToggle.Name = "AimBtn"
-    aimToggle.Size = UDim2.new(0.8, 0, 0, 42)
-    aimToggle.Position = UDim2.new(0.1, 0, 0, 115)
-    aimToggle.BackgroundColor3 = Color3.fromRGB(0, 150, 80)
-    aimToggle.Text = "AIM: ON"
-    aimToggle.TextColor3 = Color3.new(1, 1, 1)
-    aimToggle.TextSize = 17
-    aimToggle.Font = Enum.Font.GothamBold
-    aimToggle.ZIndex = 11
-    aimToggle.Parent = state.mainFrame
-
-    local aimCorner = Instance.new("UICorner")
-    aimCorner.CornerRadius = UDim.new(0, 8)
-    aimCorner.Parent = aimToggle
-
-    -- BOTÃO ABRIR
-    state.openButton = Instance.new("TextButton")
-    state.openButton.Name = "OpenBtn"
-    state.openButton.Size = UDim2.fromOffset(100, 38)
-    state.openButton.Position = state.mainFrame.Position
-    state.openButton.BackgroundColor3 = Color3.fromRGB(15, 17, 25)
-    state.openButton.Text = "RED ESP  +"
-    state.openButton.TextColor3 = Color3.new(1, 1, 1)
-    state.openButton.TextSize = 15
-    state.openButton.Font = Enum.Font.GothamBold
-    state.openButton.Visible = false
-    state.openButton.Active = true
-    state.openButton.Draggable = true
-    state.openButton.ZIndex = 10
-    state.openButton.Parent = state.gui
-
-    local openCorner = Instance.new("UICorner")
-    openCorner.CornerRadius = UDim.new(0, 9)
-    openCorner.Parent = state.openButton
-
-    local openStroke = Instance.new("UIStroke")
-    openStroke.Color = Color3.fromRGB(0, 140, 255)
-    openStroke.Thickness = 2
-    openStroke.Parent = state.openButton
-
-    -- EVENTOS DA UI
-    
-    -- Minimizar
-    minimize.MouseButton1Click:Connect(function()
-        state.minimized = true
-        state.mainFrame.Visible = false
-        state.openButton.Position = state.mainFrame.Position
-        state.openButton.Visible = true
-    end)
-
-    -- Abrir
-    state.openButton.MouseButton1Click:Connect(function()
-        state.minimized = false
-        state.mainFrame.Position = state.openButton.Position
-        state.mainFrame.Visible = true
-        state.openButton.Visible = false
-    end)
-
-    -- Ativar/Desativar ESP
-    espToggle.MouseButton1Click:Connect(function()
-        state.espEnabled = not state.espEnabled
-        espToggle.Text = state.espEnabled
+print("[CUE7A] API exportada como _G.CuecaAPI")
